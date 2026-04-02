@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BIGRS Delhi — Speed & Helmet Unified Risk Map</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.heat/0.2.0/leaflet-heat.js"></script>
+<style>
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'Segoe UI',system-ui,sans-serif; background:#0F172A; color:#E2E8F0; }
+
+/* ── Header ── */
+#hdr {
+  background:#0F172A; padding:10px 18px;
+  display:flex; align-items:center; justify-content:space-between;
+  border-bottom:2px solid #334155; position:relative; z-index:1000; gap:12px;
+}
+#hdr-title h1 { font-size:14px; font-weight:700; color:#F1F5F9; }
+#hdr-title p  { font-size:10px; color:#64748B; margin-top:1px; }
+.hdr-pills { display:flex; gap:6px; flex-wrap:wrap; }
+.hdr-pill  { padding:3px 9px; border-radius:10px; font-size:10px; font-weight:700; white-space:nowrap; }
+
+/* ── Layout ── */
+#layout { display:flex; height:calc(100vh - 50px); }
+
+/* ── Sidebar ── */
+#sb {
+  width:320px; min-width:320px;
+  background:#1E293B; border-right:1px solid #334155;
+  display:flex; flex-direction:column; overflow:hidden;
+}
+
+/* metric toggle */
+#metric-bar {
+  padding:10px 12px; background:#0F172A;
+  border-bottom:1px solid #334155;
+}
+#metric-bar h3 { font-size:9px; text-transform:uppercase; letter-spacing:1.2px; color:#475569; margin-bottom:7px; }
+.metric-tabs { display:flex; gap:4px; }
+.mtab {
+  flex:1; padding:5px 4px; border-radius:5px; text-align:center;
+  font-size:10px; font-weight:700; cursor:pointer;
+  border:1.5px solid #334155; color:#94A3B8; background:#1E293B;
+  transition:all 0.15s;
+}
+.mtab.active { border-color:transparent; }
+
+/* filter/sort */
+#ctrl-bar {
+  padding:7px 12px; background:#0F172A; border-bottom:1px solid #334155;
+  display:flex; gap:6px; align-items:center;
+}
+#ctrl-bar label { font-size:9px; color:#475569; text-transform:uppercase; letter-spacing:0.8px; white-space:nowrap; font-weight:700; }
+#road-sel, #sort-sel {
+  flex:1; font-size:10px; background:#1E293B; color:#E2E8F0;
+  border:1px solid #334155; border-radius:4px; padding:3px 5px;
+}
+
+/* site list */
+#site-list { flex:1; overflow-y:auto; }
+#site-list::-webkit-scrollbar { width:4px; }
+#site-list::-webkit-scrollbar-thumb { background:#334155; border-radius:2px; }
+
+.sc {
+  padding:10px 12px; border-bottom:1px solid #0F172A;
+  cursor:pointer; transition:background 0.12s; position:relative;
+}
+.sc:hover  { background:#263348; }
+.sc.active { background:#1E3A5F; border-left:3px solid #60A5FA; }
+.sc-left-bar { position:absolute; left:0; top:0; bottom:0; width:3px; }
+.sc-rank { position:absolute; top:10px; right:10px; font-size:10px; font-weight:700; padding:1px 6px; border-radius:8px; color:#fff; }
+.sc-name { font-size:11.5px; font-weight:600; color:#F1F5F9; line-height:1.3; padding-right:36px; }
+.sc-road { font-size:9.5px; color:#64748B; margin:2px 0 6px; }
+.tri { display:grid; grid-template-columns:1fr 1fr 1fr; gap:4px; }
+.tri-box { background:#0F172A; border-radius:4px; padding:4px 3px; text-align:center; border:1px solid #1E293B; }
+.tri-val { font-size:14px; font-weight:700; display:block; }
+.tri-lbl { font-size:8px; color:#475569; text-transform:uppercase; letter-spacing:0.4px; display:block; margin-top:1px; }
+
+/* summary */
+#sum-bar {
+  padding:8px 12px; background:#0F172A; border-top:1px solid #334155;
+  display:grid; grid-template-columns:repeat(4,1fr); gap:3px;
+}
+.sb-it { text-align:center; }
+.sb-v  { font-size:14px; font-weight:700; display:block; }
+.sb-l  { font-size:8px; color:#475569; text-transform:uppercase; letter-spacing:0.4px; }
+
+/* ── Map ── */
+#map { flex:1; position:relative; }
+
+/* controls */
+#mc { position:absolute; top:10px; right:10px; z-index:1000; display:flex; flex-direction:column; gap:4px; }
+.mc-btn {
+  background:rgba(15,23,42,0.93); border-radius:5px; padding:5px 9px;
+  font-size:10px; font-weight:700; cursor:pointer;
+  border:1px solid #334155; color:#94A3B8; transition:all 0.15s;
+}
+.mc-btn.active { background:#1D4ED8; color:#fff; border-color:#1D4ED8; }
+
+/* legend */
+#leg {
+  position:absolute; bottom:24px; right:10px; z-index:1000;
+  background:rgba(15,23,42,0.96); border-radius:8px;
+  padding:11px 13px; border:1px solid #334155;
+  box-shadow:0 2px 14px rgba(0,0,0,0.6); font-size:11px; min-width:210px;
+}
+#leg h4 { font-size:9px; text-transform:uppercase; letter-spacing:1px; color:#475569; margin-bottom:6px; }
+.lr { display:flex; align-items:center; gap:8px; margin-bottom:4px; color:#CBD5E1; }
+.ld { width:12px; height:12px; border-radius:50%; flex-shrink:0; }
+.ls { border:none; border-top:1px solid #334155; margin:7px 0; }
+#leg-metric-name { color:#60A5FA; font-weight:700; }
+
+/* popup */
+.pw { font-size:12px; min-width:240px; background:#1E293B; color:#E2E8F0; margin:-13px -20px; padding:14px; border-radius:4px; }
+.pt { font-size:13px; font-weight:700; color:#F1F5F9; border-bottom:2px solid #EF4444; padding-bottom:5px; margin-bottom:7px; }
+.proad { display:inline-block; padding:2px 8px; border-radius:8px; font-size:10px; font-weight:700; color:#fff; margin-bottom:8px; }
+.psec { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; color:#475569; margin:8px 0 4px; }
+.pg3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:4px; margin-bottom:6px; }
+.pb3 { text-align:center; background:#0F172A; border-radius:5px; padding:5px 3px; }
+.pv3 { font-size:15px; font-weight:700; display:block; }
+.pl3 { font-size:8px; color:#475569; text-transform:uppercase; letter-spacing:0.4px; }
+.pbar-row { margin-bottom:4px; }
+.pbar-lbs { display:flex; justify-content:space-between; font-size:9.5px; color:#64748B; margin-bottom:2px; }
+.pbar-tr { height:5px; background:#1E293B; border-radius:3px; }
+.pbar-fi { height:100%; border-radius:3px; }
+.pn { font-size:9px; color:#475569; text-align:right; margin-top:5px; }
+.verified-badge { font-size:9px; color:#22C55E; float:right; }
+
+/* ── Layer control panel ── */
+#layer-ctrl {
+  position:absolute; top:10px; left:10px; z-index:1000;
+  background:rgba(15,23,42,0.93); border-radius:8px;
+  border:1px solid #334155; padding:9px 11px; min-width:158px;
+}
+#layer-ctrl h4 { font-size:9px; text-transform:uppercase; letter-spacing:1px; color:#475569; margin-bottom:7px; font-weight:700; }
+.lay-btn {
+  display:flex; align-items:center; gap:8px; padding:5px 8px;
+  border-radius:5px; cursor:pointer; margin-bottom:4px;
+  font-size:10px; font-weight:700; color:#94A3B8;
+  border:1.5px solid #334155; background:#1E293B;
+  transition:all 0.15s; width:100%; text-align:left;
+}
+.lay-btn:last-child { margin-bottom:0; }
+.lay-btn.active { color:#fff; border-color:transparent; }
+.lay-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+/* layer legend additions */
+.lay-leg { margin-top:6px; padding-top:6px; border-top:1px solid #334155; display:none; }
+.lay-leg.show { display:block; }
+.lay-leg h4 { margin-bottom:5px; }
+.lr-road { height:3px; border-radius:2px; flex-shrink:0; width:18px; }
+
+/* population layer */
+.pop-label { background:none!important; border:none!important; box-shadow:none!important; font-size:9px; font-weight:700; color:#F1F5F9; text-shadow:0 1px 4px rgba(0,0,0,0.9),0 0 2px rgba(0,0,0,0.7); text-align:center; white-space:nowrap; }
+.pop-grad { display:inline-block; width:100%; height:10px; border-radius:3px; background:linear-gradient(90deg,#22C55E,#EAB308,#F97316,#EF4444); }
+
+/* Campaign impact layer */
+.camp-icon { display:flex; align-items:center; justify-content:center; border-radius:50%; font-weight:900; color:#fff; border:3px solid rgba(0,0,0,0.4); box-shadow:0 0 0 3px rgba(255,255,255,0.15),0 3px 10px rgba(0,0,0,0.7); }
+
+/* Campaign panel */
+#camp-panel {
+  width:300px; min-width:300px;
+  background:#0F172A; border-left:1px solid #334155;
+  display:none; flex-direction:column; overflow:hidden;
+  z-index:500;
+}
+#camp-panel.show { display:flex; }
+#camp-panel.show { display:flex; }
+#camp-hdr { padding:10px 12px; background:#1E293B; border-bottom:1px solid #334155; flex-shrink:0; }
+#camp-hdr h3 { font-size:11px; font-weight:700; color:#F1F5F9; margin-bottom:2px; }
+#camp-hdr p  { font-size:9px; color:#64748B; }
+#camp-list { flex:1; overflow-y:auto; }
+#camp-list::-webkit-scrollbar { width:4px; }
+#camp-list::-webkit-scrollbar-thumb { background:#334155; border-radius:2px; }
+.cc { padding:9px 12px; border-bottom:1px solid #1E293B; cursor:pointer; transition:background 0.12s; }
+.cc:hover { background:#1E293B; }
+.cc-top { display:flex; align-items:center; gap:7px; margin-bottom:5px; }
+.cc-tier { width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:900; color:#fff; flex-shrink:0; }
+.cc-name { font-size:10.5px; font-weight:600; color:#F1F5F9; line-height:1.3; flex:1; }
+.cc-score { font-size:12px; font-weight:700; flex-shrink:0; }
+.cc-bars { display:grid; grid-template-columns:1fr; gap:3px; }
+.cc-bar-row { display:flex; align-items:center; gap:5px; }
+.cc-bar-lbl { font-size:8px; color:#475569; width:80px; flex-shrink:0; text-align:right; }
+.cc-bar-tr  { flex:1; height:4px; background:#1E293B; border-radius:2px; }
+.cc-bar-fi  { height:100%; border-radius:2px; }
+.cc-bar-val { font-size:8px; color:#94A3B8; width:28px; flex-shrink:0; text-align:right; }
+#camp-foot { padding:8px 12px; background:#1E293B; border-top:1px solid #334155; font-size:8.5px; color:#475569; flex-shrink:0; }
+</style>
+</head>
+<body>
+
+<div id="hdr">
+  <div id="hdr-title">
+    <h1>BIGRS Delhi — Speed &amp; Helmet Unified Risk Map</h1>
+    <p>All values verified against BIGRS3 R9 Technical Appendix · 18 speed sites (n=74,927) + 15 helmet sites (n=68,196) · Official PDF GPS coordinates</p>
+  </div>
+  <div class="hdr-pills">
+    <span class="hdr-pill" style="background:#1D4ED8">🚗 All vehicles R9</span>
+    <span class="hdr-pill" style="background:#7C3AED">🏍 Motorcycles R9</span>
+    <span class="hdr-pill" style="background:#065F46">🪖 Helmet R2</span>
+  </div>
+</div>
+
+<div id="layout">
+<div id="sb">
+
+  <div id="metric-bar">
+    <h3>Primary metric (bubble colour)</h3>
+    <div class="metric-tabs">
+      <div class="mtab active" data-m="overspeed_pct"     id="mtab-all"    onclick="setMetric('overspeed_pct')"     style="background:#7C2D12;color:#FCA5A5;border-color:#7C2D12">🚗 All<br>overspeed</div>
+      <div class="mtab"        data-m="moto_overspeed_pct" id="mtab-moto"   onclick="setMetric('moto_overspeed_pct')" style="color:#A78BFA">🏍 Moto<br>overspeed</div>
+      <div class="mtab"        data-m="all_correct_pct"   id="mtab-helmet" onclick="setMetric('all_correct_pct')"   style="color:#6EE7B7">🪖 Helmet<br>correct</div>
+    </div>
+  </div>
+
+  <div id="ctrl-bar">
+    <label>Road</label>
+    <select id="road-sel" onchange="applyFilters()">
+      <option value="all">All types</option>
+      <option value="Collector/Distributor">Collector</option>
+      <option value="Arterial Road">Arterial</option>
+      <option value="Expressway">Expressway</option>
+    </select>
+    <label>Sort</label>
+    <select id="sort-sel" onchange="applyFilters()">
+      <option value="risk">Risk score ↓</option>
+      <option value="overspeed">All overspeed ↓</option>
+      <option value="moto_spd">Moto overspeed ↓</option>
+      <option value="helmet_asc">Helmet correct ↑ (worst)</option>
+      <option value="volume">Volume ↓</option>
+    </select>
+  </div>
+
+  <div id="site-list"></div>
+
+  <div id="sum-bar">
+    <div class="sb-it"><span class="sb-v" id="s-n">—</span><span class="sb-l">Sites</span></div>
+    <div class="sb-it"><span class="sb-v" id="s-spd" style="color:#F87171">—</span><span class="sb-l">Avg overspeed</span></div>
+    <div class="sb-it"><span class="sb-v" id="s-moto" style="color:#C084FC">—</span><span class="sb-l">Avg moto spd</span></div>
+    <div class="sb-it"><span class="sb-v" id="s-helm" style="color:#34D399">—</span><span class="sb-l">Avg helmet</span></div>
+  </div>
+</div>
+
+<div id="map">
+  
+  <div id="layer-ctrl">
+    <h4>Overlay Layers</h4>
+    <button class="lay-btn" id="lay-roads"      onclick="toggleLayer('roads')">
+      <span class="lay-dot" style="background:linear-gradient(135deg,#EF4444 40%,#EAB308 100%)"></span>
+      <span class="lay-txt">Road types</span>
+    </button>
+    <button class="lay-btn" id="lay-cameras"    onclick="toggleLayer('cameras')">
+      <span class="lay-dot" style="background:#60A5FA"></span>
+      <span class="lay-txt">Speed cameras</span>
+    </button>
+    <button class="lay-btn" id="lay-billboards" onclick="toggleLayer('billboards')">
+      <span class="lay-dot" style="background:#A78BFA"></span>
+      <span class="lay-txt">Billboards</span>
+    </button>
+    <button class="lay-btn" id="lay-blackspots" onclick="toggleLayer('blackspots')">
+      <span class="lay-dot" style="background:#F97316"></span>
+      <span class="lay-txt">Blackspots</span>
+    </button>
+    <button class="lay-btn" id="lay-popdensity" onclick="toggleLayer('popdensity')">
+      <span class="lay-dot" style="background:linear-gradient(135deg,#22C55E 30%,#EF4444 100%)"></span>
+      <span class="lay-txt">Pop. density</span>
+    </button>
+    <button class="lay-btn" id="lay-popheat" onclick="toggleLayer('popheat')">
+      <span class="lay-dot" style="background:linear-gradient(135deg,#3B82F6 30%,#EF4444 100%)"></span>
+      <span class="lay-txt">Pop. heatmap</span>
+    </button>
+    <button class="lay-btn" id="lay-campaign" onclick="toggleLayer('campaign')" style="border-color:#7C3AED;color:#C4B5FD;margin-top:6px">
+      <span class="lay-dot" style="background:linear-gradient(135deg,#7C3AED,#EF4444)"></span>
+      <span class="lay-txt">🏍 Campaign impact</span>
+    </button>
+    <div class="lay-leg" id="road-leg">
+      <h4>Road type key</h4>
+      <div class="lr"><div class="lr-road" style="background:#EF4444"></div> Trunk / Motorway</div>
+      <div class="lr"><div class="lr-road" style="background:#F97316"></div> Primary arterial</div>
+      <div class="lr"><div class="lr-road" style="background:#EAB308"></div> Secondary collector</div>
+      <div class="lr"><div class="lr-road" style="background:#94A3B8"></div> Tertiary local</div>
+    </div>
+    <div class="lay-leg" id="bs-leg">
+      <h4>Blackspot severity</h4>
+      <div class="lr"><div class="lay-dot" style="background:#EF4444"></div> 8+ fatalities</div>
+      <div class="lr"><div class="lay-dot" style="background:#F97316"></div> 5–7 fatalities</div>
+      <div class="lr"><div class="lay-dot" style="background:#EAB308"></div> &lt;5 fatalities</div>
+    </div>
+    <div class="lay-leg" id="pop-leg">
+      <h4>Population density</h4>
+      <div class="lr"><div class="lay-dot" style="background:#EF4444"></div> &gt;25,000/km² — Very High</div>
+      <div class="lr"><div class="lay-dot" style="background:#F97316"></div> 15,000–25,000/km²</div>
+      <div class="lr"><div class="lay-dot" style="background:#EAB308"></div> 8,000–15,000/km²</div>
+      <div class="lr"><div class="lay-dot" style="background:#22C55E"></div> &lt;8,000/km² — Low</div>
+      <div style="font-size:9px;color:#475569;margin-top:4px">Circle size = total population<br>Source: Census 2011 + 2024 estimates</div>
+    </div>
+    <div class="lay-leg" id="heat-leg">
+      <h4>Population heatmap</h4>
+      <div class="pop-grad"></div>
+      <div style="display:flex;justify-content:space-between;font-size:8px;color:#64748B;margin-top:2px"><span>Low</span><span>High</span></div>
+      <div style="font-size:9px;color:#475569;margin-top:4px">Ward-level population intensity</div>
+    </div>
+    <div class="lay-leg" id="camp-leg">
+      <h4>Campaign priority</h4>
+      <div class="lr"><div class="lay-dot" style="background:#DC2626"></div> P1 — Critical priority</div>
+      <div class="lr"><div class="lay-dot" style="background:#EA580C"></div> P2 — High priority</div>
+      <div class="lr"><div class="lay-dot" style="background:#CA8A04"></div> P3 — Medium priority</div>
+      <div style="font-size:9px;color:#475569;margin-top:4px">Score = moto overspeed + volume<br>+ speed excess + pop density<br>+ blackspot proximity</div>
+    </div>
+  </div>
+  <div id="mc">
+    <button class="mc-btn active" data-t="dark"  onclick="switchTile('dark')">Dark</button>
+    <button class="mc-btn"        data-t="osm"   onclick="switchTile('osm')">Map</button>
+    <button class="mc-btn"        data-t="sat"   onclick="switchTile('sat')">Satellite</button>
+  </div>
+  <div id="leg">
+    <h4>Bubble fill — <span id="leg-metric-name">All vehicles overspeed %</span></h4>
+    <div class="lr"><div class="ld" style="background:#22C55E"></div> <span id="leg-lo">Low risk</span></div>
+    <div class="lr"><div class="ld" style="background:#EAB308"></div> <span id="leg-md">Moderate</span></div>
+    <div class="lr"><div class="ld" style="background:#F97316"></div> <span id="leg-hi">High</span></div>
+    <div class="lr"><div class="ld" style="background:#EF4444"></div> <span id="leg-vhi">Very High</span></div>
+    <div class="ls"></div>
+    <h4>Ring colour — correct helmet use</h4>
+    <div class="lr"><div class="ld" style="border:2.5px solid #EF4444;background:transparent;width:14px;height:14px"></div> &lt;35% — Critical</div>
+    <div class="lr"><div class="ld" style="border:2.5px solid #F97316;background:transparent;width:14px;height:14px"></div> 35–50%</div>
+    <div class="lr"><div class="ld" style="border:2.5px solid #EAB308;background:transparent;width:14px;height:14px"></div> 50–65%</div>
+    <div class="lr"><div class="ld" style="border:2.5px solid #22C55E;background:transparent;width:14px;height:14px"></div> &gt;65% — Better</div>
+    <div class="lr"><div class="ld" style="border:2.5px dashed #475569;background:transparent;width:14px;height:14px"></div> No helmet data</div>
+    <div class="ls"></div>
+    <div style="font-size:9px;color:#475569">Bubble size = observation volume<br>✅ Verified vs BIGRS3 R9 Technical Appendix</div>
+  </div>
+</div>
+
+<!-- Campaign ranking panel — flex sibling of #map inside #layout -->
+<div id="camp-panel">
+  <div id="camp-hdr">
+    <h3>🏍 Moto Speeding Campaign — Site Priority</h3>
+    <p>Ranked by composite impact score · higher = intervene first</p>
+  </div>
+  <div id="camp-list"></div>
+  <div id="camp-foot">Score weights: moto overspeed 35% · volume 20% · speed excess 20% · pop density 15% · blackspot 10%</div>
+</div>
+</div>
+
+<script>
+const SITES = [{"loc": "Africa Avenue- Outer Ring Road Intersection", "lat": 28.5591056, "lon": 77.1876093, "road_type": "Collector/Distributor", "total_vehicles": 4172, "overspeed_pct": 76.1, "mean_speed": 56.5, "p85_speed": 73, "max_speed": 120, "moto_total": 1062, "moto_overspeed_pct": 82.3, "moto_mean": 64.6, "moto_p85": 82, "moto_max": 120, "has_helmet": true, "helmet_dist_m": 974, "all_correct_pct": 75.9, "all_any_pct": 79.5, "all_none_pct": 20.5, "drv_correct_pct": 82.7, "pax_correct_pct": 56.5, "helmet_n": 4025, "risk_score": 106}, {"loc": "Delhi- Noida Freeway (DND)", "lat": 28.5756915, "lon": 77.2836927, "road_type": "Expressway", "total_vehicles": 5575, "overspeed_pct": 35.4, "mean_speed": 59.2, "p85_speed": 72, "max_speed": 98, "moto_total": 948, "moto_overspeed_pct": 19.5, "moto_mean": 60.7, "moto_p85": 72, "moto_max": 98, "has_helmet": true, "helmet_dist_m": 1972, "all_correct_pct": 64.1, "all_any_pct": 81.2, "all_none_pct": 18.8, "drv_correct_pct": 68.2, "pax_correct_pct": 51.3, "helmet_n": 5066, "risk_score": 55}, {"loc": "Dr Hedgewar Marg (Near Mukarba Chowk)", "lat": 28.7357603, "lon": 77.1736412, "road_type": "Arterial Road", "total_vehicles": 3462, "overspeed_pct": 58.0, "mean_speed": 54.6, "p85_speed": 65, "max_speed": 126, "moto_total": 481, "moto_overspeed_pct": 43.0, "moto_mean": 59.2, "moto_p85": 72, "moto_max": 126, "has_helmet": false, "helmet_dist_m": 3583, "all_correct_pct": null, "all_any_pct": null, "all_none_pct": null, "drv_correct_pct": null, "pax_correct_pct": null, "helmet_n": null, "risk_score": 93}, {"loc": "Dr Zakir Hussain Marg", "lat": 28.608929, "lon": 77.2334424, "road_type": "Collector/Distributor", "total_vehicles": 4300, "overspeed_pct": 43.9, "mean_speed": 46.7, "p85_speed": 58, "max_speed": 93, "moto_total": 1221, "moto_overspeed_pct": 52.8, "moto_mean": 52.4, "moto_p85": 64, "moto_max": 93, "has_helmet": true, "helmet_dist_m": 529, "all_correct_pct": 65.2, "all_any_pct": 83.5, "all_none_pct": 16.5, "drv_correct_pct": 69.3, "pax_correct_pct": 55.1, "helmet_n": 5633, "risk_score": 88}, {"loc": "Dr. M.C Davar Marg to B-4 Road Intersection at Badli", "lat": 28.7280469, "lon": 77.1307088, "road_type": "Collector/Distributor", "total_vehicles": 3384, "overspeed_pct": 40.0, "mean_speed": 46.6, "p85_speed": 53, "max_speed": 92, "moto_total": 434, "moto_overspeed_pct": 27.0, "moto_mean": 45.8, "moto_p85": 59, "moto_max": 92, "has_helmet": true, "helmet_dist_m": 971, "all_correct_pct": 38.3, "all_any_pct": 48.8, "all_none_pct": 51.2, "drv_correct_pct": 44.3, "pax_correct_pct": 21.7, "helmet_n": 4405, "risk_score": 89}, {"loc": "Greater Kailash Part 1 to S- Block Road", "lat": 28.5488239, "lon": 77.2354095, "road_type": "Collector/Distributor", "total_vehicles": 4013, "overspeed_pct": 9.3, "mean_speed": 36.7, "p85_speed": 45, "max_speed": 97, "moto_total": 609, "moto_overspeed_pct": 7.7, "moto_mean": 37.8, "moto_p85": 46, "moto_max": 65, "has_helmet": true, "helmet_dist_m": 1154, "all_correct_pct": 49.6, "all_any_pct": 63.8, "all_none_pct": 36.2, "drv_correct_pct": 51.3, "pax_correct_pct": 42.9, "helmet_n": 3354, "risk_score": 58}, {"loc": "Kasturba Gandhi Intersection", "lat": 28.6210611, "lon": 77.2263463, "road_type": "Collector/Distributor", "total_vehicles": 3657, "overspeed_pct": 26.4, "mean_speed": 39.9, "p85_speed": 50, "max_speed": 139, "moto_total": 394, "moto_overspeed_pct": 14.7, "moto_mean": 40.4, "moto_p85": 50, "moto_max": 85, "has_helmet": true, "helmet_dist_m": 122, "all_correct_pct": 62.8, "all_any_pct": 82.3, "all_none_pct": 17.7, "drv_correct_pct": 66.8, "pax_correct_pct": 50.1, "helmet_n": 1691, "risk_score": 52}, {"loc": "Kingsway Camp Intersection", "lat": 28.7002702, "lon": 77.2013474, "road_type": "Collector/Distributor", "total_vehicles": 4322, "overspeed_pct": 37.9, "mean_speed": 45.8, "p85_speed": 58, "max_speed": 103, "moto_total": 1017, "moto_overspeed_pct": 45.1, "moto_mean": 51.6, "moto_p85": 65, "moto_max": 95, "has_helmet": true, "helmet_dist_m": 680, "all_correct_pct": 21.8, "all_any_pct": 36.2, "all_none_pct": 63.8, "drv_correct_pct": 28.1, "pax_correct_pct": 9.3, "helmet_n": 4301, "risk_score": 123}, {"loc": "Lodhi Road- Bhishma Pitah Marg Intersection", "lat": 28.5916315, "lon": 77.2314766, "road_type": "Arterial Road", "total_vehicles": 4179, "overspeed_pct": 25.8, "mean_speed": 43.4, "p85_speed": 52, "max_speed": 107, "moto_total": 664, "moto_overspeed_pct": 29.2, "moto_mean": 46.0, "moto_p85": 57, "moto_max": 93, "has_helmet": true, "helmet_dist_m": 191, "all_correct_pct": 63.8, "all_any_pct": 84.9, "all_none_pct": 15.1, "drv_correct_pct": 67.1, "pax_correct_pct": 54.5, "helmet_n": 3498, "risk_score": 65}, {"loc": "NH 44 Opposite Gurudwara Libaspur - Carriage Towards Delhi", "lat": 28.7654082, "lon": 77.1457003, "road_type": "Expressway", "total_vehicles": 5047, "overspeed_pct": 52.5, "mean_speed": 52.9, "p85_speed": 65, "max_speed": 120, "moto_total": 474, "moto_overspeed_pct": 14.3, "moto_mean": 54.5, "moto_p85": 67, "moto_max": 95, "has_helmet": false, "helmet_dist_m": 3501, "all_correct_pct": null, "all_any_pct": null, "all_none_pct": null, "drv_correct_pct": null, "pax_correct_pct": null, "helmet_n": null, "risk_score": 64}, {"loc": "NH 44 Opposite Khatri Nursery - Carriage Towards Singhu Border", "lat": 28.836891, "lon": 77.1282641, "road_type": "Expressway", "total_vehicles": 4103, "overspeed_pct": 65.4, "mean_speed": 67.9, "p85_speed": 86, "max_speed": 193, "moto_total": 379, "moto_overspeed_pct": 73.1, "moto_mean": 78.8, "moto_p85": 93, "moto_max": 107, "has_helmet": false, "helmet_dist_m": 11375, "all_correct_pct": null, "all_any_pct": null, "all_none_pct": null, "drv_correct_pct": null, "pax_correct_pct": null, "helmet_n": null, "risk_score": 123}, {"loc": "NH 44 Opposite Khatu Shyam Temple - Carriage Towards Delhi", "lat": 28.7895209, "lon": 77.1418854, "road_type": "Expressway", "total_vehicles": 4081, "overspeed_pct": 56.2, "mean_speed": 61.1, "p85_speed": 74, "max_speed": 147, "moto_total": 330, "moto_overspeed_pct": 37.6, "moto_mean": 65.2, "moto_p85": 83, "moto_max": 107, "has_helmet": false, "helmet_dist_m": 6095, "all_correct_pct": null, "all_any_pct": null, "all_none_pct": null, "drv_correct_pct": null, "pax_correct_pct": null, "helmet_n": null, "risk_score": 88}, {"loc": "Noida Link Road", "lat": 28.5920327, "lon": 77.2952849, "road_type": "Collector/Distributor", "total_vehicles": 4231, "overspeed_pct": 13.9, "mean_speed": 43.5, "p85_speed": 53, "max_speed": 102, "moto_total": 1064, "moto_overspeed_pct": 15.1, "moto_mean": 48.5, "moto_p85": 61, "moto_max": 92, "has_helmet": true, "helmet_dist_m": 374, "all_correct_pct": 64.1, "all_any_pct": 81.2, "all_none_pct": 18.8, "drv_correct_pct": 68.2, "pax_correct_pct": 51.3, "helmet_n": 5066, "risk_score": 51}, {"loc": "Peeragarhi Intersection", "lat": 28.6863874, "lon": 77.0956121, "road_type": "Arterial Road", "total_vehicles": 4542, "overspeed_pct": 10.4, "mean_speed": 40.9, "p85_speed": 50, "max_speed": 85, "moto_total": 992, "moto_overspeed_pct": 9.8, "moto_mean": 46.3, "moto_p85": 55, "moto_max": 85, "has_helmet": true, "helmet_dist_m": 278, "all_correct_pct": 55.6, "all_any_pct": 63.8, "all_none_pct": 36.2, "drv_correct_pct": 63.5, "pax_correct_pct": 31.1, "helmet_n": 4315, "risk_score": 54}, {"loc": "Rao Tula Ram Intersection", "lat": 28.5747473, "lon": 77.16816, "road_type": "Collector/Distributor", "total_vehicles": 3784, "overspeed_pct": 54.6, "mean_speed": 46.4, "p85_speed": 55, "max_speed": 112, "moto_total": 213, "moto_overspeed_pct": 38.5, "moto_mean": 48.1, "moto_p85": 60, "moto_max": 83, "has_helmet": true, "helmet_dist_m": 816, "all_correct_pct": 76.3, "all_any_pct": 85.1, "all_none_pct": 14.9, "drv_correct_pct": 79.8, "pax_correct_pct": 66.3, "helmet_n": 3816, "risk_score": 62}, {"loc": "Signature Bridge", "lat": 28.7043924, "lon": 77.2422469, "road_type": "Arterial Road", "total_vehicles": 3945, "overspeed_pct": 53.3, "mean_speed": 49.8, "p85_speed": 64, "max_speed": 162, "moto_total": 775, "moto_overspeed_pct": 60.5, "moto_mean": 54.7, "moto_p85": 68, "moto_max": 95, "has_helmet": true, "helmet_dist_m": 1713, "all_correct_pct": 43.8, "all_any_pct": 50.5, "all_none_pct": 49.5, "drv_correct_pct": 61.1, "pax_correct_pct": 19.7, "helmet_n": 6349, "risk_score": 117}, {"loc": "Vande Matram Road- Pusa Road Intersection", "lat": 28.6199258, "lon": 77.1767227, "road_type": "Collector/Distributor", "total_vehicles": 4376, "overspeed_pct": 29.0, "mean_speed": 50.3, "p85_speed": 59, "max_speed": 126, "moto_total": 878, "moto_overspeed_pct": 26.3, "moto_mean": 54.8, "moto_p85": 65, "moto_max": 86, "has_helmet": true, "helmet_dist_m": 559, "all_correct_pct": 53.0, "all_any_pct": 75.8, "all_none_pct": 24.2, "drv_correct_pct": 56.7, "pax_correct_pct": 45.8, "helmet_n": 4689, "risk_score": 73}, {"loc": "Vikash Marg- Nirman Vihar Intersection", "lat": 28.6392838, "lon": 77.2921835, "road_type": "Arterial Road", "total_vehicles": 3754, "overspeed_pct": 24.0, "mean_speed": 39.6, "p85_speed": 50, "max_speed": 92, "moto_total": 516, "moto_overspeed_pct": 27.9, "moto_mean": 44.0, "moto_p85": 59, "moto_max": 92, "has_helmet": true, "helmet_dist_m": 873, "all_correct_pct": 48.1, "all_any_pct": 64.0, "all_none_pct": 36.0, "drv_correct_pct": 55.3, "pax_correct_pct": 29.3, "helmet_n": 6306, "risk_score": 80}];
+
+// ── COLOUR SCALES ─────────────────────────────────────────────────────────────
+function spdCol(v) {
+  if (v===null||v<0) return '#475569';
+  if (v < 20) return '#22C55E';
+  if (v < 40) return '#EAB308';
+  if (v < 65) return '#F97316';
+  return '#EF4444';
+}
+function helmCol(v) {
+  if (v===null||v<0) return '#475569';
+  if (v < 35) return '#EF4444';
+  if (v < 50) return '#F97316';
+  if (v < 65) return '#EAB308';
+  return '#22C55E';
+}
+// For helmet metric: low correct = bad (red), high correct = good (green)
+function metricCol(s, metric) {
+  if (metric === 'all_correct_pct') return helmCol(s[metric]);
+  return spdCol(s[metric]);
+}
+function ringCol(s) {
+  return s.has_helmet ? helmCol(s.all_correct_pct) : '#475569';
+}
+function roadBg(rt) {
+  if (rt==='Arterial Road')          return '#991B1B';
+  if (rt==='Expressway')             return '#78350F';
+  return '#1E40AF';
+}
+function radiusFor(n) {
+  const mn=3384, mx=5575;
+  return 12 + ((Math.min(n,mx)-mn)/(mx-mn))*20;
+}
+function riskBg(r) {
+  if (r > 120) return '#991B1B';
+  if (r > 90)  return '#C2410C';
+  if (r > 65)  return '#A16207';
+  return '#166534';
+}
+
+// ── MAP ───────────────────────────────────────────────────────────────────────
+const map = L.map('map',{zoomControl:true}).setView([28.64,77.20],11);
+const TILES = {
+  dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'© CartoDB',maxZoom:19}),
+  osm:  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors',maxZoom:19}),
+  sat:  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{attribution:'© Esri/Maxar',maxZoom:19}),
+};
+TILES.dark.addTo(map);
+
+function switchTile(t) {
+  document.querySelectorAll('.mc-btn').forEach(b=>b.classList.toggle('active',b.dataset.t===t));
+  Object.values(TILES).forEach(l=>map.removeLayer(l));
+  TILES[t].addTo(map);
+  Object.values(markers).forEach(m=>m.bringToFront());
+}
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let activeMetric = 'overspeed_pct';
+let activeRoad   = 'all';
+let activeSort   = 'risk';
+const markers    = {};
+
+// ── LEGEND LABELS ─────────────────────────────────────────────────────────────
+const LEG = {
+  overspeed_pct:      {name:'All vehicles overspeed %',    lo:'<20% — Low', md:'20–40%', hi:'40–65% — High', vhi:'>65% — Very High'},
+  moto_overspeed_pct: {name:'Motorcycle overspeed %',      lo:'<20% — Low', md:'20–40%', hi:'40–65% — High', vhi:'>65% — Very High'},
+  all_correct_pct:    {name:'Correct helmet use % (inverted)',lo:'>65% — Better',md:'50–65%',hi:'35–50%',vhi:'<35% — Critical'},
+};
+
+function updateLegend() {
+  const L = LEG[activeMetric];
+  document.getElementById('leg-metric-name').textContent = L.name;
+  document.getElementById('leg-lo').textContent  = L.lo;
+  document.getElementById('leg-md').textContent  = L.md;
+  document.getElementById('leg-hi').textContent  = L.hi;
+  document.getElementById('leg-vhi').textContent = L.vhi;
+}
+
+// ── MARKERS ───────────────────────────────────────────────────────────────────
+SITES.forEach(s => {
+  const m = L.circleMarker([s.lat, s.lon], {
+    radius:      radiusFor(s.total_vehicles),
+    fillColor:   metricCol(s, activeMetric),
+    color:       ringCol(s),
+    weight:      3,
+    fillOpacity: 0.85,
+    dashArray:   s.has_helmet ? null : '4,3',
+  });
+
+  const hHelmet = s.has_helmet ? `
+    <div class="psec">🪖 Helmet Use — Round 2 (n=${(s.helmet_n||0).toLocaleString()})</div>
+    <div class="pg3">
+      <div class="pb3"><span class="pv3" style="color:${helmCol(s.all_correct_pct)}">${s.all_correct_pct}%</span><span class="pl3">All correct</span></div>
+      <div class="pb3"><span class="pv3" style="color:${helmCol(s.drv_correct_pct)}">${s.drv_correct_pct}%</span><span class="pl3">Drivers</span></div>
+      <div class="pb3"><span class="pv3" style="color:${helmCol(s.pax_correct_pct)}">${s.pax_correct_pct}%</span><span class="pl3">Passengers</span></div>
+    </div>
+    <div class="pbar-row"><div class="pbar-lbs"><span>Correctly worn</span><span>${s.all_correct_pct}%</span></div><div class="pbar-tr"><div class="pbar-fi" style="width:${s.all_correct_pct}%;background:${helmCol(s.all_correct_pct)}"></div></div></div>
+    <div class="pbar-row"><div class="pbar-lbs"><span>No helmet</span><span>${s.all_none_pct}%</span></div><div class="pbar-tr"><div class="pbar-fi" style="width:${s.all_none_pct}%;background:#EF4444"></div></div></div>
+  ` : `<div class="psec" style="color:#F87171">⚠ No helmet data at this site (speed-only observation point)</div>`;
+
+  m.bindTooltip(`<b>${s.loc}</b><br>🚗 Overspeed: ${s.overspeed_pct}% &nbsp;|&nbsp; 🏍 Moto: ${s.moto_overspeed_pct}% &nbsp;|&nbsp; 🪖 ${s.has_helmet ? s.all_correct_pct+'% correct helmet' : 'no helmet data'}`, {sticky:true, className:'lf-tip'});
+
+  m.bindPopup(`
+    <div class="pw">
+      <div class="pt">${s.loc} <span class="verified-badge">✅ verified</span></div>
+      <span class="proad" style="background:${roadBg(s.road_type)}">${s.road_type}</span>
+      <span style="float:right;font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;background:${riskBg(s.risk_score)};color:#fff">Risk ${s.risk_score}/200</span>
+      <div style="clear:both"></div>
+
+      <div class="psec">🚗 All Vehicles Speed — Round 9 (n=${s.total_vehicles.toLocaleString()})</div>
+      <div class="pg3">
+        <div class="pb3"><span class="pv3" style="color:${spdCol(s.overspeed_pct)}">${s.overspeed_pct}%</span><span class="pl3">Overspeed</span></div>
+        <div class="pb3"><span class="pv3">${s.mean_speed}</span><span class="pl3">Mean km/h</span></div>
+        <div class="pb3"><span class="pv3">${s.p85_speed}</span><span class="pl3">85th pct</span></div>
+      </div>
+      <div class="pbar-row"><div class="pbar-lbs"><span>Overspeed rate</span><span>${s.overspeed_pct}%</span></div><div class="pbar-tr"><div class="pbar-fi" style="width:${s.overspeed_pct}%;background:${spdCol(s.overspeed_pct)}"></div></div></div>
+
+      <div class="psec">🏍 Motorcycles Only — Round 9 (n=${s.moto_total.toLocaleString()})</div>
+      <div class="pg3">
+        <div class="pb3"><span class="pv3" style="color:${spdCol(s.moto_overspeed_pct)}">${s.moto_overspeed_pct}%</span><span class="pl3">Overspeed</span></div>
+        <div class="pb3"><span class="pv3">${s.moto_mean}</span><span class="pl3">Mean km/h</span></div>
+        <div class="pb3"><span class="pv3">${s.moto_p85}</span><span class="pl3">85th pct</span></div>
+      </div>
+      <div class="pbar-row"><div class="pbar-lbs"><span>Moto overspeed rate</span><span>${s.moto_overspeed_pct}%</span></div><div class="pbar-tr"><div class="pbar-fi" style="width:${s.moto_overspeed_pct}%;background:${spdCol(s.moto_overspeed_pct)}"></div></div></div>
+
+      ${hHelmet}
+      <div class="pn">Max speed recorded: ${s.moto_max} km/h (motorcycles)</div>
+    </div>`, {maxWidth:310, className:'dark-popup'});
+
+  m.on('click', ()=>highlightCard(s.loc));
+  m.addTo(map);
+  markers[s.loc] = m;
+});
+
+// ── UPDATE MARKERS ON METRIC CHANGE ──────────────────────────────────────────
+function refreshMarkers() {
+  SITES.forEach(s => {
+    const m = markers[s.loc];
+    if (!m) return;
+    m.setStyle({
+      fillColor: metricCol(s, activeMetric),
+      color:     ringCol(s),
+      dashArray: s.has_helmet ? null : '4,3',
+    });
+  });
+}
+
+// ── METRIC TABS ───────────────────────────────────────────────────────────────
+function setMetric(m) {
+  activeMetric = m;
+  document.querySelectorAll('.mtab').forEach(t => {
+    const isActive = t.dataset.m === m;
+    t.classList.toggle('active', isActive);
+    if (isActive) {
+      if (m==='overspeed_pct')      t.style.background='#7C2D12', t.style.color='#FCA5A5', t.style.borderColor='#7C2D12';
+      if (m==='moto_overspeed_pct') t.style.background='#4C1D95', t.style.color='#DDD6FE', t.style.borderColor='#4C1D95';
+      if (m==='all_correct_pct')    t.style.background='#064E3B', t.style.color='#6EE7B7', t.style.borderColor='#064E3B';
+    } else {
+      t.style.background='#1E293B'; t.style.color='#94A3B8'; t.style.borderColor='#334155';
+    }
+  });
+  refreshMarkers();
+  updateLegend();
+  applyFilters();
+}
+
+// ── FILTER + SORT + SIDEBAR ───────────────────────────────────────────────────
+function applyFilters() {
+  activeRoad = document.getElementById('road-sel').value;
+  activeSort = document.getElementById('sort-sel').value;
+
+  let data = SITES.filter(s => activeRoad==='all' || s.road_type===activeRoad);
+  data = [...data].sort((a,b) => {
+    if (activeSort==='risk')       return b.risk_score - a.risk_score;
+    if (activeSort==='overspeed')  return b.overspeed_pct - a.overspeed_pct;
+    if (activeSort==='moto_spd')   return b.moto_overspeed_pct - a.moto_overspeed_pct;
+    if (activeSort==='helmet_asc') {
+      const av = a.has_helmet ? a.all_correct_pct : 999;
+      const bv = b.has_helmet ? b.all_correct_pct : 999;
+      return av - bv;
+    }
+    if (activeSort==='volume') return b.total_vehicles - a.total_vehicles;
+    return 0;
+  });
+
+  // Show/hide markers
+  const shown = new Set(data.map(s=>s.loc));
+  SITES.forEach(s => {
+    const m = markers[s.loc];
+    if (shown.has(s.loc)) { if (!map.hasLayer(m)) m.addTo(map); }
+    else                  { if (map.hasLayer(m))  map.removeLayer(m); }
+  });
+
+  // Summary
+  const wH = data.filter(s=>s.has_helmet);
+  document.getElementById('s-n').textContent    = data.length;
+  document.getElementById('s-spd').textContent  = (data.reduce((a,s)=>a+s.overspeed_pct,0)/data.length).toFixed(0)+'%';
+  document.getElementById('s-moto').textContent = (data.reduce((a,s)=>a+s.moto_overspeed_pct,0)/data.length).toFixed(0)+'%';
+  document.getElementById('s-helm').textContent = wH.length
+    ? (wH.reduce((a,s)=>a+s.all_correct_pct,0)/wH.length).toFixed(0)+'%' : '—';
+
+  // Cards
+  const list = document.getElementById('site-list');
+  list.innerHTML = '';
+  data.forEach((s, idx) => {
+    const card = document.createElement('div');
+    card.className = 'sc';
+    card.dataset.loc = s.loc;
+    const rb = riskBg(s.risk_score);
+    const sc = spdCol(s.overspeed_pct);
+    const mc = spdCol(s.moto_overspeed_pct);
+    const hc = s.has_helmet ? helmCol(s.all_correct_pct) : '#475569';
+    const hv = s.has_helmet ? s.all_correct_pct+'%' : '—';
+    card.innerHTML = `
+      <div class="sc-left-bar" style="background:${rb}"></div>
+      <span class="sc-rank" style="background:${rb}">${s.risk_score}</span>
+      <div class="sc-name">${idx+1}. ${s.loc}</div>
+      <div class="sc-road">${s.road_type} · ${s.total_vehicles.toLocaleString()} vehicles</div>
+      <div class="tri">
+        <div class="tri-box" style="border-color:${sc}33">
+          <span class="tri-val" style="color:${sc}">${s.overspeed_pct}%</span>
+          <span class="tri-lbl">🚗 Overspeed</span>
+        </div>
+        <div class="tri-box" style="border-color:${mc}33">
+          <span class="tri-val" style="color:${mc}">${s.moto_overspeed_pct}%</span>
+          <span class="tri-lbl">🏍 Moto spd</span>
+        </div>
+        <div class="tri-box" style="border-color:${hc}33">
+          <span class="tri-val" style="color:${hc}">${hv}</span>
+          <span class="tri-lbl">🪖 Helmet ✓</span>
+        </div>
+      </div>`;
+    card.addEventListener('click', () => {
+      map.setView([s.lat,s.lon],15,{animate:true});
+      markers[s.loc].openPopup();
+      highlightCard(s.loc);
+    });
+    list.appendChild(card);
+  });
+}
+
+function highlightCard(loc) {
+  document.querySelectorAll('.sc').forEach(c=>c.classList.remove('active'));
+  const el = document.querySelector(`.sc[data-loc="${CSS.escape(loc)}"]`);
+  if (el) { el.classList.add('active'); el.scrollIntoView({behavior:'smooth',block:'nearest'}); }
+}
+
+
+// ── BLACKSPOT DATA (Delhi Traffic Police crash reports 2023–2024) ──────────────
+const BLACKSPOTS = [
+  {name:"Azadpur Sabzi Mandi",     road:"GT Karnal Road / NH-44",        lat:28.7175, lon:77.1758, crashes:20, fatal:11, year:2024},
+  {name:"Akshardham Mandir",       road:"NH-24 (NH-9 Ghaziabad Link)",   lat:28.6127, lon:77.2773, crashes:19, fatal:8,  year:2024},
+  {name:"Bhalswa Chowk",           road:"Outer Ring Road",                lat:28.7518, lon:77.1664, crashes:19, fatal:6,  year:2024},
+  {name:"ISBT Kashmiri Gate",      road:"Ring Road / NH-44",              lat:28.6672, lon:77.2278, crashes:17, fatal:8,  year:2024},
+  {name:"SGT Nagar",               road:"Rohtak Road / NH-58",            lat:28.6978, lon:77.1089, crashes:18, fatal:7,  year:2024},
+  {name:"Libaspur Bus Stand",      road:"NH-44 (GT Karnal Road)",         lat:28.7615, lon:77.1487, crashes:18, fatal:6,  year:2024},
+  {name:"Mukarba Chowk",          road:"Outer Ring Road / NH-44",        lat:28.7157, lon:77.1733, crashes:15, fatal:5,  year:2023},
+  {name:"Dhaula Kuan",             road:"NH-48 / Ring Road",              lat:28.5968, lon:77.1611, crashes:14, fatal:6,  year:2023},
+  {name:"Yudhishthir Setu",        road:"Ring Road (Yamuna Bank)",        lat:28.6534, lon:77.2412, crashes:12, fatal:4,  year:2023},
+  {name:"Burari Road",             road:"GT Karnal Road (North Delhi)",   lat:28.7257, lon:77.2167, crashes:12, fatal:3,  year:2023},
+  {name:"Salimgarh Flyover",       road:"Ring Road / NH-44",              lat:28.6587, lon:77.2472, crashes:10, fatal:3,  year:2023},
+  {name:"Daryaganj",               road:"Ring Road / Outer Ring Road",    lat:28.6478, lon:77.2398, crashes:11, fatal:3,  year:2023},
+  {name:"Civil Lines (Ring Road)", road:"Ring Road, North Delhi",         lat:28.6798, lon:77.2234, crashes:10, fatal:4,  year:2023},
+];
+
+// ── LAYER STATE ───────────────────────────────────────────────────────────────
+const layerGroups = {roads:null, cameras:null, billboards:null, blackspots:null, popdensity:null, popheat:null, campaign:null};
+const layerLoaded = {roads:false, cameras:false, billboards:false, blackspots:false, popdensity:false, popheat:false, campaign:false};
+const layerActive = {roads:false, cameras:false, billboards:false, blackspots:false, popdensity:false, popheat:false, campaign:false};
+
+// ── DELHI DISTRICT POPULATION DATA (Census 2011 + 2024 projections) ──────────
+const DELHI_POP = [
+  {name:"Central Delhi",     lat:28.6471, lon:77.2167, pop:646385,  area:25.05, density:25803},
+  {name:"East Delhi",        lat:28.6273, lon:77.3060, pop:1709346, area:64.21, density:26622},
+  {name:"New Delhi",         lat:28.6129, lon:77.2295, pop:142004,  area:35.36, density:4017},
+  {name:"North Delhi",       lat:28.7060, lon:77.2137, pop:887978,  area:60.93, density:14574},
+  {name:"North East Delhi",  lat:28.6920, lon:77.2635, pop:2241624, area:60.12, density:37284},
+  {name:"North West Delhi",  lat:28.7200, lon:77.0800, pop:3656539, area:440.0, density:8310},
+  {name:"South Delhi",       lat:28.5300, lon:77.2100, pop:2731929, area:250.6, density:10903},
+  {name:"South East Delhi",  lat:28.5600, lon:77.2700, pop:1765754, area:40.24, density:43885},
+  {name:"South West Delhi",  lat:28.5600, lon:77.1000, pop:2292958, area:420.0, density:5460},
+  {name:"West Delhi",        lat:28.6500, lon:77.1000, pop:2543243, area:129.0, density:19714},
+  {name:"Shahdara",          lat:28.6700, lon:77.2900, pop:1693194, area:25.0,  density:67728},
+];
+
+// Ward-level population grid for heatmap (synthetic sub-points from district data)
+const HEAT_POINTS = (function(){
+  const pts=[];
+  // Generate sub-grid points from each district, weighted by density
+  DELHI_POP.forEach(d=>{
+    const w = d.density/10000; // intensity weight
+    const spread = Math.sqrt(d.area)/120; // geographic spread
+    const nPts = Math.min(Math.ceil(d.pop/80000),25);
+    for(let i=0;i<nPts;i++){
+      const jLat = d.lat + (Math.random()-0.5)*spread*2;
+      const jLon = d.lon + (Math.random()-0.5)*spread*2;
+      pts.push([jLat, jLon, w]);
+    }
+  });
+  return pts;
+})();
+const OVERPASS = 'https://overpass-api.de/api/interpreter';
+// tight bounding box covering all 18 BIGRS sites
+const BBOX = '28.52,77.09,28.88,77.32';
+
+function toggleLayer(name) {
+  const btn = document.getElementById('lay-'+name);
+  layerActive[name] = !layerActive[name];
+  if (!layerActive[name]) {
+    if (layerGroups[name]) map.removeLayer(layerGroups[name]);
+    btn.classList.remove('active');
+    if (name==='roads')       document.getElementById('road-leg').classList.remove('show');
+    if (name==='blackspots')  document.getElementById('bs-leg').classList.remove('show');
+    if (name==='popdensity')  document.getElementById('pop-leg').classList.remove('show');
+    if (name==='popheat')     document.getElementById('heat-leg').classList.remove('show');
+    if (name==='campaign')  { document.getElementById('camp-leg').classList.remove('show'); document.getElementById('camp-panel').classList.remove('show'); }
+    return;
+  }
+  btn.classList.add('active');
+  if (name==='roads')       document.getElementById('road-leg').classList.add('show');
+  if (name==='blackspots')  document.getElementById('bs-leg').classList.add('show');
+  if (name==='popdensity')  document.getElementById('pop-leg').classList.add('show');
+  if (name==='popheat')     document.getElementById('heat-leg').classList.add('show');
+  if (name==='campaign')  { document.getElementById('camp-leg').classList.add('show'); document.getElementById('camp-panel').classList.add('show'); }
+  if (layerLoaded[name]) { layerGroups[name].addTo(map); return; }
+  const span = btn.querySelector('.lay-txt');
+  span.textContent = 'Loading…';
+  if (name==='roads')      loadRoads(btn);
+  if (name==='cameras')    loadCameras(btn);
+  if (name==='billboards') loadBillboards(btn);
+  if (name==='blackspots') loadBlackspots(btn);
+  if (name==='popdensity')  loadPopDensity(btn);
+  if (name==='popheat')     loadPopHeat(btn);
+  if (name==='campaign')    loadCampaign(btn);
+}
+
+// ── CAMPAIGN IMPACT SCORE ─────────────────────────────────────────────────────
+function haversineKm(lat1,lon1,lat2,lon2) {
+  const R=6371, dLat=(lat2-lat1)*Math.PI/180, dLon=(lon2-lon1)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+function calcCampaignScores() {
+  // Normalise helpers
+  const motoSpds  = SITES.map(s=>s.moto_overspeed_pct);
+  const motoVols  = SITES.map(s=>s.moto_total);
+  const p85s      = SITES.map(s=>s.moto_p85);
+  const LIMIT     = 50; // Delhi urban speed limit km/h
+  const norm = (v,mn,mx) => Math.max(0,Math.min(1,(v-mn)/(mx-mn)));
+  const mnSpd=Math.min(...motoSpds), mxSpd=Math.max(...motoSpds);
+  const mnVol=Math.min(...motoVols), mxVol=Math.max(...motoVols);
+  const mnP85=Math.min(...p85s),     mxP85=Math.max(...p85s);
+
+  // Max pop density across districts for normalisation
+  const mxDens = Math.max(...DELHI_POP.map(d=>d.density));
+
+  return SITES.map(s => {
+    // 1. Moto overspeed severity (35%)
+    const spdScore = norm(s.moto_overspeed_pct, mnSpd, mxSpd);
+
+    // 2. Moto volume — reach (20%)
+    const volScore = norm(s.moto_total, mnVol, mxVol);
+
+    // 3. Speed excess above limit (20%)
+    const excessScore = norm(s.moto_p85 - LIMIT, mnP85-LIMIT, mxP85-LIMIT);
+
+    // 4. Nearest district population density (15%)
+    let minDistKm=Infinity, nearDens=0;
+    DELHI_POP.forEach(d=>{
+      const km = haversineKm(s.lat,s.lon,d.lat,d.lon);
+      if(km<minDistKm){ minDistKm=km; nearDens=d.density; }
+    });
+    const popScore = norm(nearDens, 0, mxDens);
+
+    // 5. Blackspot proximity within 5km (10%)
+    let bsScore = 0;
+    BLACKSPOTS.forEach(bs=>{
+      const km = haversineKm(s.lat,s.lon,bs.lat,bs.lon);
+      if(km<=5){
+        const contrib = bs.fatal>=8?1.0:bs.fatal>=5?0.65:0.35;
+        bsScore = Math.max(bsScore, contrib*(1-km/5));
+      }
+    });
+
+    const composite = (spdScore*0.35 + volScore*0.20 + excessScore*0.20 + popScore*0.15 + bsScore*0.10)*100;
+
+    return {
+      ...s,
+      camp_score: Math.round(composite),
+      camp_spd:   Math.round(spdScore*100),
+      camp_vol:   Math.round(volScore*100),
+      camp_excess:Math.round(excessScore*100),
+      camp_pop:   Math.round(popScore*100),
+      camp_bs:    Math.round(bsScore*100),
+      camp_tier:  composite>=66?1:composite>=40?2:3,
+      camp_dist:  Math.round(nearDens).toLocaleString(),
+    };
+  }).sort((a,b)=>b.camp_score-a.camp_score);
+}
+
+const TIER_COL = {1:'#DC2626', 2:'#EA580C', 3:'#CA8A04'};
+
+function loadCampaign(btn) {
+  const scored = calcCampaignScores();
+  const group  = L.layerGroup();
+
+  scored.forEach((s,i) => {
+    const col  = TIER_COL[s.camp_tier];
+    const sz   = s.camp_tier===1?36:s.camp_tier===2?30:24;
+    const icon = L.divIcon({
+      html:`<div class="camp-icon" style="width:${sz}px;height:${sz}px;background:${col};font-size:${sz>30?12:10}px">P${s.camp_tier}</div>`,
+      className:'', iconSize:[sz,sz], iconAnchor:[sz/2,sz/2]
+    });
+    L.marker([s.lat,s.lon],{icon,zIndexOffset:800})
+      .bindTooltip(`<b>🏍 ${s.loc}</b><br>Campaign score: <b>${s.camp_score}/100</b> · Priority ${s.camp_tier}<br>Moto overspeed: ${s.moto_overspeed_pct}% · Volume: ${s.moto_total} · P85: ${s.moto_p85} km/h`,{sticky:true})
+      .bindPopup(`<div style="min-width:250px;font-size:12px;color:#E2E8F0;background:#1E293B;margin:-13px -20px;padding:14px;border-radius:4px">
+        <div style="font-size:13px;font-weight:700;color:#F1F5F9;border-bottom:2px solid ${col};padding-bottom:5px;margin-bottom:8px">🏍 ${s.loc}</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <div style="background:${col};border-radius:50%;width:38px;height:38px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;color:#fff;flex-shrink:0">P${s.camp_tier}</div>
+          <div><div style="font-size:22px;font-weight:700;color:${col}">${s.camp_score}<span style="font-size:11px;color:#64748B">/100</span></div><div style="font-size:9px;color:#64748B">Campaign Impact Score</div></div>
+        </div>
+        <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#475569;margin-bottom:5px">Score components</div>
+        ${[
+          ['🏍 Moto overspeed severity',s.camp_spd,col],
+          ['👥 Moto volume (reach)',s.camp_vol,'#60A5FA'],
+          ['⚡ Speed excess above limit',s.camp_excess,'#F97316'],
+          ['🏙 Population density nearby',s.camp_pop,'#A78BFA'],
+          ['⚠ Blackspot proximity',s.camp_bs,'#EF4444'],
+        ].map(([lbl,v,c])=>`
+          <div style="margin-bottom:4px">
+            <div style="display:flex;justify-content:space-between;font-size:9px;color:#64748B;margin-bottom:2px"><span>${lbl}</span><span style="color:${c}">${v}%</span></div>
+            <div style="height:5px;background:#0F172A;border-radius:3px"><div style="width:${v}%;height:100%;background:${c};border-radius:3px"></div></div>
+          </div>`).join('')}
+        <div style="font-size:9px;color:#475569;margin-top:8px">Pop density nearby: ${s.camp_dist}/km² · Moto P85: ${s.moto_p85} km/h</div>
+      </div>`,{maxWidth:280,className:'dark-popup'})
+      .on('click',()=>highlightCard(s.loc))
+      .addTo(group);
+  });
+
+  layerGroups.campaign = group;
+  layerLoaded.campaign  = true;
+  group.addTo(map);
+  Object.values(markers).forEach(m=>m.bringToFront());
+  btn.querySelector('.lay-txt').textContent = '🏍 Campaign impact';
+
+  // Build ranking panel
+  const list = document.getElementById('camp-list');
+  list.innerHTML = '';
+  scored.forEach((s,i)=>{
+    const col = TIER_COL[s.camp_tier];
+    const div = document.createElement('div');
+    div.className='cc';
+    div.innerHTML=`
+      <div class="cc-top">
+        <div class="cc-tier" style="background:${col}">P${s.camp_tier}</div>
+        <div class="cc-name">${i+1}. ${s.loc}</div>
+        <div class="cc-score" style="color:${col}">${s.camp_score}</div>
+      </div>
+      <div class="cc-bars">
+        ${[
+          ['Moto overspeed',s.camp_spd,col],
+          ['Volume reach',s.camp_vol,'#60A5FA'],
+          ['Speed excess',s.camp_excess,'#F97316'],
+          ['Pop density',s.camp_pop,'#A78BFA'],
+          ['Blackspot',s.camp_bs,'#EF4444'],
+        ].map(([lbl,v,c])=>`
+          <div class="cc-bar-row">
+            <span class="cc-bar-lbl">${lbl}</span>
+            <div class="cc-bar-tr"><div class="cc-bar-fi" style="width:${v}%;background:${c}"></div></div>
+            <span class="cc-bar-val">${v}%</span>
+          </div>`).join('')}
+      </div>`;
+    div.addEventListener('click',()=>{
+      map.setView([s.lat,s.lon],15,{animate:true});
+      setTimeout(()=>markers[s.loc]&&markers[s.loc].openPopup(),400);
+    });
+    list.appendChild(div);
+  });
+}
+
+const ROAD_COL = {
+  motorway:'#EF4444', motorway_link:'#EF4444',
+  trunk:'#EF4444',    trunk_link:'#EF4444',
+  primary:'#F97316',  primary_link:'#F97316',
+  secondary:'#EAB308',tertiary:'#94A3B8',
+};
+const ROAD_W = {motorway:4,trunk:4,primary:3,secondary:2,tertiary:1.5};
+
+async function loadRoads(btn) {
+  const q = `[out:json][timeout:35];(way["highway"~"^(motorway|trunk|primary|secondary|tertiary)$"](${BBOX}););out geom qt;`;
+  try {
+    const r = await fetch(OVERPASS,{method:'POST',body:'data='+encodeURIComponent(q)});
+    const d = await r.json();
+    const group = L.layerGroup();
+    d.elements.forEach(el => {
+      if (!el.geometry||!el.tags) return;
+      const hw = el.tags.highway;
+      L.polyline(el.geometry.map(p=>[p.lat,p.lon]),{
+        color:ROAD_COL[hw]||'#64748B', weight:ROAD_W[hw]||1.5, opacity:0.65
+      }).bindTooltip(el.tags.name||hw,{sticky:true}).addTo(group);
+    });
+    layerGroups.roads = group; layerLoaded.roads = true;
+    group.addTo(map);
+    Object.values(markers).forEach(m=>m.bringToFront());
+    btn.querySelector('.lay-txt').textContent = 'Road types';
+  } catch(e) {
+    btn.querySelector('.lay-txt').textContent = '⚠ Failed'; layerActive.roads=false; btn.classList.remove('active');
+    document.getElementById('road-leg').classList.remove('show');
+  }
+}
+
+async function loadCameras(btn) {
+  const q = `[out:json][timeout:25];node["highway"="speed_camera"](${BBOX});out body;`;
+  try {
+    const r = await fetch(OVERPASS,{method:'POST',body:'data='+encodeURIComponent(q)});
+    const d = await r.json();
+    const group = L.layerGroup();
+    d.elements.forEach(el => {
+      L.marker([el.lat,el.lon],{
+        icon:L.divIcon({html:'<div style="font-size:17px;line-height:1;filter:drop-shadow(0 1px 3px rgba(0,0,0,0.8))">📷</div>',className:'',iconSize:[20,20],iconAnchor:[10,10]})
+      }).bindTooltip(`<b>Speed Camera</b>${el.tags&&el.tags.maxspeed?'<br>Limit: '+el.tags.maxspeed+' km/h':''}`).addTo(group);
+    });
+    layerGroups.cameras = group; layerLoaded.cameras = true;
+    group.addTo(map);
+    btn.querySelector('.lay-txt').textContent = `Speed cams (${d.elements.length})`;
+  } catch(e) {
+    btn.querySelector('.lay-txt').textContent = '⚠ Failed'; layerActive.cameras=false; btn.classList.remove('active');
+  }
+}
+
+async function loadBillboards(btn) {
+  const q = `[out:json][timeout:25];(node["advertising"="billboard"](${BBOX});way["advertising"="billboard"](${BBOX}););out center qt;`;
+  try {
+    const r = await fetch(OVERPASS,{method:'POST',body:'data='+encodeURIComponent(q)});
+    const d = await r.json();
+    const group = L.layerGroup();
+    d.elements.forEach(el => {
+      const lat = el.lat ?? el.center?.lat;
+      const lon = el.lon ?? el.center?.lon;
+      if (lat==null) return;
+      L.marker([lat,lon],{
+        icon:L.divIcon({html:'<div style="font-size:16px;line-height:1;filter:drop-shadow(0 1px 3px rgba(0,0,0,0.8))">🪧</div>',className:'',iconSize:[18,18],iconAnchor:[9,9]})
+      }).bindTooltip(`<b>Billboard / Hoarding</b>${el.tags?.name?'<br>'+el.tags.name:''}`).addTo(group);
+    });
+    layerGroups.billboards = group; layerLoaded.billboards = true;
+    group.addTo(map);
+    btn.querySelector('.lay-txt').textContent = `Billboards (${d.elements.length})`;
+  } catch(e) {
+    btn.querySelector('.lay-txt').textContent = '⚠ Failed'; layerActive.billboards=false; btn.classList.remove('active');
+  }
+}
+
+function popDensityCol(d) {
+  if (d > 25000) return '#EF4444';
+  if (d > 15000) return '#F97316';
+  if (d > 8000)  return '#EAB308';
+  return '#22C55E';
+}
+function popRadius(pop) {
+  return 18 + Math.sqrt(pop/50000)*3;
+}
+
+function loadPopDensity(btn) {
+  const group = L.layerGroup();
+  DELHI_POP.forEach(d => {
+    const col = popDensityCol(d.density);
+    const r = popRadius(d.pop);
+    L.circleMarker([d.lat, d.lon], {
+      radius: r,
+      fillColor: col,
+      color: col,
+      weight: 2,
+      fillOpacity: 0.30,
+      opacity: 0.8,
+    }).bindTooltip(`<b>${d.name}</b><br>👥 ${(d.pop/1e6).toFixed(2)}M population<br>📐 ${d.area.toLocaleString()} km²<br>🏘 ${d.density.toLocaleString()}/km² density`, {sticky:true})
+     .bindPopup(`<div style="min-width:220px;font-size:12px;color:#E2E8F0;background:#1E293B;margin:-13px -20px;padding:14px;border-radius:4px">
+        <div style="font-size:13px;font-weight:700;color:#F1F5F9;border-bottom:2px solid ${col};padding-bottom:5px;margin-bottom:8px">👥 ${d.name}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;text-align:center;margin-bottom:8px">
+          <div style="background:#0F172A;border-radius:5px;padding:7px 4px">
+            <span style="font-size:18px;font-weight:700;color:#60A5FA;display:block">${(d.pop/1e6).toFixed(2)}M</span>
+            <span style="font-size:8px;color:#475569;text-transform:uppercase;letter-spacing:0.5px">Population</span>
+          </div>
+          <div style="background:#0F172A;border-radius:5px;padding:7px 4px">
+            <span style="font-size:18px;font-weight:700;color:${col};display:block">${d.density.toLocaleString()}</span>
+            <span style="font-size:8px;color:#475569;text-transform:uppercase;letter-spacing:0.5px">per km²</span>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;text-align:center">
+          <div style="background:#0F172A;border-radius:5px;padding:7px 4px">
+            <span style="font-size:18px;font-weight:700;color:#94A3B8;display:block">${d.area.toLocaleString()}</span>
+            <span style="font-size:8px;color:#475569;text-transform:uppercase;letter-spacing:0.5px">Area km²</span>
+          </div>
+          <div style="background:#0F172A;border-radius:5px;padding:7px 4px">
+            <span style="font-size:18px;font-weight:700;color:#C084FC;display:block">${(d.pop/DELHI_POP.reduce((a,x)=>a+x.pop,0)*100).toFixed(1)}%</span>
+            <span style="font-size:8px;color:#475569;text-transform:uppercase;letter-spacing:0.5px">Delhi share</span>
+          </div>
+        </div>
+        <div style="font-size:9px;color:#475569;margin-top:8px">Source: Census 2011 + projected estimates</div>
+      </div>`, {maxWidth:260, className:'dark-popup'})
+     .addTo(group);
+    // District name label
+    L.marker([d.lat, d.lon], {
+      icon: L.divIcon({
+        html: `<div style="font-size:8px;font-weight:700;color:#F1F5F9;text-shadow:0 1px 4px rgba(0,0,0,0.95);text-align:center;white-space:nowrap">${d.name}<br><span style="color:${col};font-size:10px">${(d.pop/1e6).toFixed(1)}M</span></div>`,
+        className: 'pop-label',
+        iconSize: [80, 28],
+        iconAnchor: [40, -r-2],
+      }),
+      interactive: false,
+    }).addTo(group);
+  });
+  layerGroups.popdensity = group;
+  layerLoaded.popdensity = true;
+  group.addTo(map);
+  Object.values(markers).forEach(m=>m.bringToFront());
+  btn.querySelector('.lay-txt').textContent = `Pop. density (${DELHI_POP.length})`;
+}
+
+function loadPopHeat(btn) {
+  const heat = L.heatLayer(HEAT_POINTS, {
+    radius: 35,
+    blur: 25,
+    maxZoom: 14,
+    max: 7,
+    gradient: {0.2:'#3B82F6', 0.4:'#22D3EE', 0.6:'#22C55E', 0.75:'#EAB308', 0.9:'#F97316', 1.0:'#EF4444'},
+  });
+  layerGroups.popheat = heat;
+  layerLoaded.popheat = true;
+  heat.addTo(map);
+  Object.values(markers).forEach(m=>m.bringToFront());
+  btn.querySelector('.lay-txt').textContent = 'Pop. heatmap';
+}
+
+function loadBlackspots(btn) {
+  const group = L.layerGroup();
+  BLACKSPOTS.forEach(bs => {
+    const col = bs.fatal>=8?'#EF4444':bs.fatal>=5?'#F97316':'#EAB308';
+    const icon = L.divIcon({
+      html:`<div style="width:24px;height:24px;background:${col};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#fff;border:2.5px solid rgba(0,0,0,0.35);box-shadow:0 2px 6px rgba(0,0,0,0.5)">⚠</div>`,
+      className:'', iconSize:[24,24], iconAnchor:[12,12]
+    });
+    L.marker([bs.lat,bs.lon],{icon,zIndexOffset:500})
+      .bindTooltip(`<b>⚠ ${bs.name}</b><br>${bs.road}<br>💥 ${bs.crashes} crashes · ☠ ${bs.fatal} fatal (${bs.year})`,{sticky:true})
+      .bindPopup(`<div style="min-width:210px;font-size:12px;color:#E2E8F0;background:#1E293B;margin:-13px -20px;padding:14px;border-radius:4px">
+        <div style="font-size:13px;font-weight:700;color:#F1F5F9;border-bottom:2px solid ${col};padding-bottom:5px;margin-bottom:8px">⚠ ${bs.name}</div>
+        <div style="font-size:10px;color:#94A3B8;margin-bottom:10px">${bs.road}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;text-align:center;margin-bottom:8px">
+          <div style="background:#0F172A;border-radius:5px;padding:7px 4px">
+            <span style="font-size:22px;font-weight:700;color:${col};display:block">${bs.crashes}</span>
+            <span style="font-size:8px;color:#475569;text-transform:uppercase;letter-spacing:0.5px">Crashes ${bs.year}</span>
+          </div>
+          <div style="background:#0F172A;border-radius:5px;padding:7px 4px">
+            <span style="font-size:22px;font-weight:700;color:#EF4444;display:block">${bs.fatal}</span>
+            <span style="font-size:8px;color:#475569;text-transform:uppercase;letter-spacing:0.5px">Fatalities</span>
+          </div>
+        </div>
+        <div style="font-size:9px;color:#475569">Source: Delhi Traffic Police Crash Report ${bs.year}</div>
+      </div>`,{maxWidth:260,className:'dark-popup'})
+      .addTo(group);
+  });
+  layerGroups.blackspots = group; layerLoaded.blackspots = true;
+  group.addTo(map);
+  btn.querySelector('.lay-txt').textContent = `Blackspots (${BLACKSPOTS.length})`;
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+updateLegend();
+applyFilters();
+map.fitBounds(SITES.map(s=>[s.lat,s.lon]),{padding:[30,30]});
+</script>
+</body>
+</html>

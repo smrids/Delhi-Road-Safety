@@ -1,0 +1,28 @@
+# Data files
+*.dta
+*.xlsx
+*.xls
+*.csv
+*.pdf
+*.pptx
+*.ppt
+*.docx
+*.doc
+*.do
+*.log
+*.sav
+*.rds
+*.rdata
+*.zip
+*.tar.gz
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Folders with data
+Data/
+data/
+Raw/
+raw/
+__pycache__/
